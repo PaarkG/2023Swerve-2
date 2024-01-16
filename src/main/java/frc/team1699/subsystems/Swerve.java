@@ -2,12 +2,8 @@ package frc.team1699.subsystems;
 
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 import com.pathplanner.lib.path.PathPlannerTrajectory;
-
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.geometry.Transform2d;
-import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
@@ -64,21 +60,15 @@ public class Swerve {
     public void driveXbox() {
         double x = driveController.getLeftX();
         x = MathUtil.applyDeadband(x, SwerveConstants.kDeadband);
+        x *= SwerveConstants.kMaxVelocity;
         double y = driveController.getLeftY();
         y = MathUtil.applyDeadband(y, SwerveConstants.kDeadband);
-        double linearMagnitude = Math.hypot(x, y);
-        Rotation2d linearDirection = new Rotation2d(x, y);
-        linearMagnitude *= SwerveConstants.kMaxVelocity;
-        Translation2d linearVelocity = 
-            new Pose2d(new Translation2d(), linearDirection)
-                .transformBy(new Transform2d(new Translation2d(linearMagnitude, 0.0), new Rotation2d()))
-            .getTranslation();
-
+        y *= SwerveConstants.kMaxVelocity;
         double rotation = driveController.getRightX();
         rotation = MathUtil.applyDeadband(rotation, SwerveConstants.kDeadband);
         rotation *= SwerveConstants.kMaxAngularVelocity;
 
-        ChassisSpeeds speeds = new ChassisSpeeds(linearVelocity.getX(), linearVelocity.getY(), rotation);
+        ChassisSpeeds speeds = new ChassisSpeeds(x, y, rotation);
         if(SwerveConstants.fieldCentric) {
             speeds = ChassisSpeeds.fromFieldRelativeSpeeds(speeds, gyro.getRotation2d());
         }
