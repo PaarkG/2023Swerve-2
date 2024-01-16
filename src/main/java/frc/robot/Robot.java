@@ -8,15 +8,16 @@ import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.XboxController;
 import frc.team1699.Constants.InputConstants;
 import frc.team1699.subsystems.Swerve;
+import frc.team1699.subsystems.Swerve.DriveState;
 
 public class Robot extends TimedRobot {
   private Swerve swerve;
-  private XboxController driverController;
+  private XboxController driveController;
 
   @Override
   public void robotInit() {
-    this.swerve = new Swerve();
-    this.driverController = new XboxController(InputConstants.kDriverControllerID);
+    driveController = new XboxController(InputConstants.kDriverControllerID);
+    swerve = new Swerve(driveController);
   }
 
   @Override
@@ -26,14 +27,18 @@ public class Robot extends TimedRobot {
   public void autonomousInit() {}
 
   @Override
-  public void autonomousPeriodic() {}
+  public void autonomousPeriodic() {
+    swerve.update();
+  }
 
   @Override
-  public void teleopInit() {}
+  public void teleopInit() {
+    swerve.setWantedState(DriveState.TELEOP);
+  }
 
   @Override
   public void teleopPeriodic() {
-    swerve.driveXbox(driverController);
+    swerve.update();
   }
 
   @Override

@@ -1,5 +1,7 @@
 package frc.team1699;
 
+import com.pathplanner.lib.util.PIDConstants;
+
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.util.Units;
@@ -69,11 +71,15 @@ public class Constants {
             new Translation2d(kWheelOffset, -kWheelOffset),
             new Translation2d(-kWheelOffset, -kWheelOffset)
         });
+        public static final double kModuleRadius = Units.inchesToMeters(14.5);
 
         public static final double kDeadband = .1;
         public static final double kMaxVelocity = Units.feetToMeters(15.1);
         public static final double kMaxAngularVelocity = 4;
 
         public static final boolean fieldCentric = true;
+
+        public static final PIDConstants kTranslationConstants = new PIDConstants(.01);
+        public static final PIDConstants kRotationConstants = new PIDConstants(.01);
     }
 }

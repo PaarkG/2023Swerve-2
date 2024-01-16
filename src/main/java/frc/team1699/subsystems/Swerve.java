@@ -1,12 +1,18 @@
 package frc.team1699.subsystems;
 
+import com.pathplanner.lib.controllers.PPHolonomicDriveController;
+import com.pathplanner.lib.path.PathPlannerTrajectory;
+
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
+import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.XboxController;
 import frc.team1699.Constants.SwerveConstants;
 import frc.team1699.Constants.SwerveModuleConstants.BL;
@@ -14,14 +20,23 @@ import frc.team1699.Constants.SwerveModuleConstants.BR;
 import frc.team1699.Constants.SwerveModuleConstants.FL;
 import frc.team1699.Constants.SwerveModuleConstants.FR;
 import frc.team1699.Constants.SwerveModuleConstants.SwerveGyroConstants;
-import frc.team1699.lib.SwerveGyro;
-import frc.team1699.lib.SwerveModule;
+import frc.team1699.lib.swerve.SwerveGyro;
+import frc.team1699.lib.swerve.SwerveModule;
 
 public class Swerve {
     private SwerveModule[] modules;
     private SwerveGyro gyro;
+    private XboxController driveController;
+    private DriveState wantedState, currentState;
 
-    public Swerve() {
+    private SwerveModulePosition[] positions;
+    private SwerveDriveOdometry odometry;
+
+    private Timer trajTimer;
+    private PathPlannerTrajectory trajectory;
+    private PPHolonomicDriveController trajController;
+
+    public Swerve(XboxController driveController) {
         this.modules = new SwerveModule[] {
             new SwerveModule(FL.kDriveID, FL.kDriveInverted, FL.kAngleID, FL.kAngleInverted, FL.kEncoderID, FL.kEncoderInverted, FL.kEncoderOffset),
             new SwerveModule(FR.kDriveID, FR.kDriveInverted, FR.kAngleID, FR.kAngleInverted, FR.kEncoderID, FR.kEncoderInverted, FR.kEncoderOffset),
@@ -29,12 +44,27 @@ public class Swerve {
             new SwerveModule(BR.kDriveID, BR.kDriveInverted, BR.kAngleID, BR.kAngleInverted, BR.kEncoderID, BR.kEncoderInverted, BR.kEncoderOffset)
         };
         this.gyro = new SwerveGyro(SwerveGyroConstants.kGyroOffset, SwerveGyroConstants.kGyroInverted);
+        this.driveController = driveController;
+
+        this.wantedState = DriveState.LOCK;
+        this.currentState = DriveState.LOCK;
+        
+        this.positions = new SwerveModulePosition[4];
+        positions[0] = modules[0].getModulePosition();
+        positions[1] = modules[1].getModulePosition();
+        positions[2] = modules[2].getModulePosition();
+        positions[3] = modules[3].getModulePosition();
+
+        this.odometry = new SwerveDriveOdometry(SwerveConstants.kinematics, gyro.getRotation2d(), positions);
+
+        this.trajTimer = new Timer();
+        this.trajController = new PPHolonomicDriveController(SwerveConstants.kTranslationConstants, SwerveConstants.kRotationConstants, SwerveConstants.kMaxVelocity, SwerveConstants.kModuleRadius);
     }
 
-    public void driveXbox(XboxController controller) {
-        double x = controller.getLeftX();
+    public void driveXbox() {
+        double x = driveController.getLeftX();
         x = MathUtil.applyDeadband(x, SwerveConstants.kDeadband);
-        double y = controller.getLeftY();
+        double y = driveController.getLeftY();
         y = MathUtil.applyDeadband(y, SwerveConstants.kDeadband);
         double linearMagnitude = Math.hypot(x, y);
         Rotation2d linearDirection = new Rotation2d(x, y);
@@ -44,7 +74,7 @@ public class Swerve {
                 .transformBy(new Transform2d(new Translation2d(linearMagnitude, 0.0), new Rotation2d()))
             .getTranslation();
 
-        double rotation = controller.getRightX();
+        double rotation = driveController.getRightX();
         rotation = MathUtil.applyDeadband(rotation, SwerveConstants.kDeadband);
         rotation *= SwerveConstants.kMaxAngularVelocity;
 
@@ -54,17 +84,93 @@ public class Swerve {
         }
 
         SwerveModuleState[] states = SwerveConstants.kinematics.toSwerveModuleStates(speeds);
-
-        for(int i = 0; i < 4; i++) {
-            modules[i].setModuleState(states[i]);
-        }
+        setModuleStates(states);
     }
 
     public void stop() {
         ChassisSpeeds speeds = new ChassisSpeeds();
         SwerveModuleState[] states = SwerveConstants.kinematics.toSwerveModuleStates(speeds);
+        setModuleStates(states);
+    }
+
+    public void lock() {
+        SwerveModuleState[] states = {
+            new SwerveModuleState(0, Rotation2d.fromDegrees(-45)),
+            new SwerveModuleState(0, Rotation2d.fromDegrees(45)),
+            new SwerveModuleState(0, Rotation2d.fromDegrees(45)),
+            new SwerveModuleState(0, Rotation2d.fromDegrees(-45))
+        };
+        setModuleStates(states);
+    }
+
+    public void setModuleStates(SwerveModuleState[] states) {
         for(int i = 0; i < 4; i++) {
             modules[i].setModuleState(states[i]);
         }
+    }
+
+    public void setTrajectory(PathPlannerTrajectory trajectory) {
+        this.trajectory = trajectory;
+    }
+
+    public SwerveModulePosition[] getModulePositions() {
+        SwerveModulePosition[] positions = new SwerveModulePosition[4];
+        for(int i = 0; i < 4; i++) {
+            positions[i] = modules[i].getModulePosition();
+        }
+        return positions;
+    }
+
+    public void setWantedState(DriveState wantedState) {
+        if(this.wantedState != wantedState) {
+            this.wantedState = wantedState;
+            handleStateTransition();
+        }
+    }
+
+    public void handleStateTransition() {
+        switch(wantedState) {
+            case TELEOP:
+                break;
+            case FOLLOW_TRAJ:
+                trajTimer.reset();
+                trajTimer.start();
+                break;
+            case LOCK:
+                break;
+        }
+        currentState = wantedState;
+    }
+
+    public void update() {
+        odometry.update(gyro.getRotation2d(), getModulePositions());
+        switch(currentState) {
+            case TELEOP:
+                driveXbox();
+                break;
+            case FOLLOW_TRAJ:
+                if(trajTimer.get() < trajectory.getTotalTimeSeconds()) {
+                    PathPlannerTrajectory.State state = trajectory.sample(trajTimer.get());
+                    ChassisSpeeds speeds = trajController.calculateRobotRelativeSpeeds(odometry.getPoseMeters(), state);
+                    SwerveModuleState[] states = SwerveConstants.kinematics.toSwerveModuleStates(speeds);
+                    setModuleStates(states);
+                } else {
+                    setWantedState(DriveState.LOCK);
+                }
+                break;
+            case LOCK:
+                lock();
+                break;
+        }
+    }
+
+    public DriveState getCurrentState() {
+        return currentState;
+    }
+
+    public enum DriveState {
+        TELEOP,
+        FOLLOW_TRAJ,
+        LOCK
     }
 }

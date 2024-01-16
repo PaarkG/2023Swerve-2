@@ -1,4 +1,4 @@
-package frc.team1699.lib;
+package frc.team1699.lib.swerve;
 
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.AnalogEncoder;

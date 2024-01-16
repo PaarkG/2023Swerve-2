@@ -1,10 +1,11 @@
-package frc.team1699.lib;
+package frc.team1699.lib.swerve;
 
 import com.revrobotics.CANSparkMax;
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import frc.team1699.Constants.SwerveModuleConstants;
 
@@ -22,6 +23,7 @@ public class SwerveModule {
         driveMotor.setInverted(driveInverted);
         this.driveController = new PIDController(.002, 0, 0);
         this.driveEncoder = driveMotor.getEncoder();
+        driveEncoder.setPositionConversionFactor(SwerveModuleConstants.kDistancePerMotorRotation);
         driveEncoder.setVelocityConversionFactor(SwerveModuleConstants.kDistancePerMotorRotation);
         this.angleMotor = new CANSparkMax(angleID, MotorType.kBrushless);
         angleMotor.setInverted(angleInverted);
@@ -41,5 +43,9 @@ public class SwerveModule {
 
     public SwerveModuleState getModuleState() {
         return new SwerveModuleState(driveEncoder.getVelocity(), angleEncoder.getRotation2d());
+    }
+
+    public SwerveModulePosition getModulePosition() {
+        return new SwerveModulePosition(driveEncoder.getPosition(), angleEncoder.getRotation2d());
     }
 }

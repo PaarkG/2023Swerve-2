@@ -1,4 +1,4 @@
-package frc.team1699.lib;
+package frc.team1699.lib.swerve;
 
 import com.kauailabs.navx.frc.AHRS;
 
